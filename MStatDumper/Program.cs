@@ -59,7 +59,7 @@ namespace MStatDumper
             var methods = globalType.Methods.First(x => x.Name == "Methods");
             var methodStats = GetMethods(versionMajor, methods).ToList();
             var methodSize = methodStats.Sum(x => x.Size + x.GcInfoSize + x.EhInfoSize);
-            var methodsByModules = methodStats.GroupBy(x => x.Method.DeclaringType.Scope).Select(x => new { x.Key.Name, Sum = x.Sum(x => x.Size + x.GcInfoSize + x.EhInfoSize) }).ToList();
+            var methodsByModules = methodStats.GroupBy(x => x.Method.DeclaringType).Select(x => new { x.Key.FullName, Sum = x.Sum(x => x.Size + x.GcInfoSize + x.EhInfoSize) }).ToList();
             if (markDownStyleOutput)
             {
                 Console.WriteLine("<details>");
@@ -71,7 +71,7 @@ namespace MStatDumper
                 Console.WriteLine("| --- | --- |");
                 foreach (var m in methodsByModules.OrderByDescending(x => x.Sum))
                 {
-                    var name = m.Name
+                    var name = m.FullName
                         .Replace("`", "\\`")
                         .Replace("<", "&#60;")
                         .Replace(">", "&#62;")
@@ -86,7 +86,7 @@ namespace MStatDumper
                 Console.WriteLine($"// ********** Methods Total Size {methodSize:n0}");
                 foreach (var m in methodsByModules.OrderByDescending(x => x.Sum))
                 {
-                    Console.WriteLine($"{m.Name,-70} {m.Sum,9:n0}");
+                    Console.WriteLine($"{m.FullName,-70} {m.Sum,9:n0}");
                 }
                 Console.WriteLine("// **********");
             }
@@ -183,7 +183,7 @@ namespace MStatDumper
             if (markDownStyleOutput)
             {
                 var methodsByScope = methodStats
-                    .Where(x => x.Method.DeclaringType.Scope.Name == "NoInliningRepro")
+                    // .Where(x => x.Method.DeclaringType.FullName.StartsWith("NoInliningRepro"))
                     .ToArray();
 
                 var methodsByClass = methodsByScope
@@ -194,8 +194,7 @@ namespace MStatDumper
 
                 static string GetClassName(MethodReference methodReference)
                 {
-                    var type = methodReference.DeclaringType.DeclaringType ?? methodReference.DeclaringType;
-                    return type.Namespace + "." + type.Name;
+                    return methodReference.DeclaringType.FullName;
                 }
 
                 Console.WriteLine("<details>");
@@ -263,7 +262,7 @@ namespace MStatDumper
                 Console.WriteLine("</details>");
 
                 var filteredTypeStats = GetTypes(versionMajor, types)
-                    .Where(x => x.Type.Scope.Name == "NoInliningRepro")
+                    // .Where(x => x.Type.FullName.StartsWith("NoInliningRepro"))
                     // .GroupBy(x => x.Type.Name)
                     .OrderByDescending(x => x.Size)
                     .Take(1000)

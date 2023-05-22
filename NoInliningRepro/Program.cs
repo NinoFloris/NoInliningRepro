@@ -1,21 +1,38 @@
 ﻿using System.Runtime.CompilerServices;
 using System;
 
-void Create<T>(Func<PgConverterInfo, PgConverter> factory)
+var helpers = new Helpers();
+
+helpers.Create<int>();
+helpers.CreateNop<short>();
+
+
+class Helpers
 {
-    factory.Invoke(new PgConverterInfo());
+    List<Func<PgConverterInfo, PgConverter>> _items = new();
+
+    void Add(Func<PgConverterInfo, PgConverter> factory, Func<PgConverterInfo, PgConverter> nullableFactory)
+    {
+        _items.Add(factory);
+        _items.Add(nullableFactory);
+    }
+
+    public void Create<T>() where T : struct
+        => Add(static info => new PgConverter<T>(info.GetResolutionAsObject()),
+            static info => new PgConverter<T?>(info.GetResolutionAsObject()));
+
+    public void CreateNop<T>() where T : struct
+        => Add(static info => new PgConverter<T>(info.GetResolutionAsObjectNop()),
+            static info => new PgConverter<T?>(info.GetResolutionAsObjectNop()));
+
 }
-
-Create<int>(info => new PgConverter<int>(info.GetResolutionAsObject()));
-
-Create<short>(info => new PgConverter<short>(info.GetResolutionAsObjectTiny()));
 
 abstract class PgConverter
 {
     public Type TypeToConvert => typeof(object);
 }
 
-class PgConverter<T> : PgConverter
+sealed class PgConverter<T> : PgConverter
 {
     readonly PgConverterResolution _resolution;
 
@@ -56,9 +73,10 @@ class PgConverterInfo
     PgConverter? Converter { get; }
     PgTypeId? PgTypeId { get; }
 
-    public PgConverterResolution GetResolutionAsObjectTiny(object? value = default, PgTypeId? expectedPgTypeId = null) => GetResolutionCoreTiny(value, expectedPgTypeId);
+    public PgConverterResolution GetResolutionAsObjectNop(object? value = default, PgTypeId? expectedPgTypeId = null) => GetResolutionCoreNop(value, expectedPgTypeId);
 
-    PgConverterResolution GetResolutionCoreTiny(object? value = default, PgTypeId? expectedPgTypeId = null)
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    PgConverterResolution GetResolutionCoreNop(object? value = default, PgTypeId? expectedPgTypeId = null)
     {
         return default;
     }
@@ -98,9 +116,9 @@ class PgConverterInfo
     [MethodImpl(MethodImplOptions.NoInlining)]
     void ThrowNotSupportedType(Type type) => throw new NotSupportedException($"ConverterInfo only supports boxing conversions, call GetResolution<T> with {typeof(object)} instead of {type}.");
 
+    sealed class PgConverterResolverInfo : PgConverterInfo
+    {
+        public PgConverterResolver ConverterResolver { get; }
+    }
 }
 
-class PgConverterResolverInfo : PgConverterInfo
-{
-    public PgConverterResolver ConverterResolver { get; }
-}
